@@ -7,6 +7,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// CopyStreamBuffered behaves like CopyStream, but allows the user to specify the buffer
+// to be used.
 func CopyStreamBuffered(dst io.Writer, src io.Reader, buf io.ReadWriteCloser) (n int, err error) {
 
 	var g errgroup.Group
@@ -61,6 +63,8 @@ func CopyStreamBuffered(dst io.Writer, src io.Reader, buf io.ReadWriteCloser) (n
 	return
 }
 
+// CopyStream behaves like io.Copy except that it passes data continuously from src to
+// dst instead of waiting for the former to return io.EOF.
 func CopyStream(dst io.Writer, src io.Reader) (int, error) {
 	return CopyStreamBuffered(dst, src, bytetoolz.NewStreamBuffer(0))
 }
