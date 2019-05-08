@@ -39,6 +39,7 @@ func (buf chanBuffer) Read(b []byte) (n int, err error) {
 	return
 }
 
+// NewStreamBuffer returns a buffer that can be used with iotoolz.CopyStream.
 func NewStreamBuffer(size int) io.ReadWriteCloser {
 	if size == 0 {
 		var buf ioBuffer
