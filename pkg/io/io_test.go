@@ -2,7 +2,9 @@ package iotoolz
 
 import (
 	"bytes"
+	"io/ioutil"
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,4 +36,18 @@ func TestCopyStream(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "hello, world!", string(b[:n]))
 	})
+}
+
+func BenchmarkCopyStream(b *testing.B) {
+	var sb strings.Builder
+	for i := 0; i < 1000; i++ {
+		sb.WriteString("hello, world!")
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		CopyStream(ioutil.Discard, bytes.NewBufferString(sb.String()))
+	}
 }

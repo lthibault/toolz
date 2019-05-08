@@ -7,6 +7,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const bcap = 64
+
 // CopyStreamBuffered behaves like CopyStream, but allows the user to specify the buffer
 // to be used.
 func CopyStreamBuffered(dst io.Writer, src io.Reader, buf chan []byte) (int, error) {
@@ -17,7 +19,7 @@ func CopyStreamBuffered(dst io.Writer, src io.Reader, buf chan []byte) (int, err
 
 	g.Go(func() (err error) {
 		var nn int
-		b := make([]byte, 64)
+		b := make([]byte, bcap)
 
 		for {
 			nn, err = src.Read(b)
@@ -37,7 +39,6 @@ func CopyStreamBuffered(dst io.Writer, src io.Reader, buf chan []byte) (int, err
 	})
 
 	g.Go(func() (err error) {
-
 		var nn int
 		for {
 			select {
