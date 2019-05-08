@@ -1,70 +1,71 @@
 package iotoolz
 
 import (
+	"context"
 	"io"
 
-	bytetoolz "github.com/lthibault/toolz/pkg/bytes"
 	"golang.org/x/sync/errgroup"
 )
 
 // CopyStreamBuffered behaves like CopyStream, but allows the user to specify the buffer
 // to be used.
-func CopyStreamBuffered(dst io.Writer, src io.Reader, buf io.ReadWriteCloser) (n int, err error) {
+func CopyStreamBuffered(dst io.Writer, src io.Reader, buf chan []byte) (int, error) {
+	defer close(buf)
 
-	var g errgroup.Group
+	var n int
+	g, ctx := errgroup.WithContext(context.Background())
 
-	g.Go(func() (e error) {
-		defer buf.Close()
-
+	g.Go(func() (err error) {
 		var nn int
 		b := make([]byte, 64)
 
 		for {
-			nn, e = src.Read(b)
-
-			if _, ee := buf.Write(b[:nn]); ee != nil {
-				break
-			}
-
-			if e != nil {
-				break
-			}
-		}
-
-		return
-	})
-
-	g.Go(func() (e error) {
-		defer buf.Close()
-
-		var nn int
-		var ee error
-		b := make([]byte, 64)
-
-		for {
-			nn, ee = buf.Read(b)
+			nn, err = src.Read(b)
 
 			if nn > 0 {
-				nn, e = dst.Write(b[:nn])
-				n += nn
+				select {
+				case buf <- b[:nn]:
+				case <-ctx.Done():
+					err = ctx.Err()
+				}
 			}
 
-			if e != nil || ee != nil {
-				break
+			if err != nil {
+				return
 			}
 		}
-
-		return
 	})
 
-	if err = g.Wait(); err == io.EOF {
-		err = nil
+	g.Go(func() (err error) {
+
+		var nn int
+		for {
+			select {
+			case b := <-buf:
+				nn, err = dst.Write(b)
+				n += nn
+			case <-ctx.Done():
+				err = ctx.Err()
+			}
+
+			if err != nil {
+				return
+			}
+		}
+	})
+
+	switch err := g.Wait(); err {
+	case nil:
+		return n, nil
+	case io.EOF:
+		return n, nil
+	default:
+		return n, err
 	}
-	return
 }
 
 // CopyStream behaves like io.Copy except that it passes data continuously from src to
 // dst instead of waiting for the former to return io.EOF.
 func CopyStream(dst io.Writer, src io.Reader) (int, error) {
-	return CopyStreamBuffered(dst, src, bytetoolz.NewStreamBuffer(0))
+	return CopyStreamBuffered(dst, src, make(chan []byte))
 }
