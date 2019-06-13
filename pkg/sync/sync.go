@@ -46,39 +46,29 @@ func (f *Flag) Bool() bool { return atomic.LoadUint32((*uint32)(unsafe.Pointer(f
 // Var is a variable that can be set exactly once.  Calls to Get will block until it is
 // set.
 type Var struct {
-	init sync.Once
-	mu   sync.Mutex
-	set  chan struct{}
-	v    interface{}
+	init, setter sync.Once
+	v            interface{}
+	ch           chan interface{}
 }
 
-func (v *Var) Ready() <-chan struct{} {
-	return v.set
+func (v *Var) setup() {
+	v.ch = make(chan interface{}, 1)
 }
 
+// Get the value once it is set
 func (v *Var) Get() interface{} {
-	v.init.Do(func() { v.set = make(chan struct{}) })
+	v.init.Do(v.setup)
+	v.setter.Do(func() {
+		v.v = <-v.ch
+	})
 
-	<-v.set
 	return v.v
 }
 
+// Set the value
 func (v *Var) Set(value interface{}) {
-	v.init.Do(func() { v.set = make(chan struct{}) })
+	v.init.Do(v.setup)
 
-	if value == nil {
-		panic("cannot set to nil")
-	}
-
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	select {
-	case <-v.set:
-		panic("already set")
-	default:
-		v.v = value
-		close(v.set)
-	}
-
+	v.ch <- value
+	close(v.ch)
 }
