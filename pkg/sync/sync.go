@@ -49,11 +49,16 @@ type Var struct {
 	init, setter sync.Once
 	v            interface{}
 	ch           chan interface{}
+	rq           chan struct{}
 }
 
 func (v *Var) setup() {
 	v.ch = make(chan interface{}, 1)
+	v.rq = make(chan struct{})
 }
+
+// Ready returns a channel that is closed when the Var's value is set
+func (v *Var) Ready() <-chan struct{} { return v.rq }
 
 // Get the value once it is set
 func (v *Var) Get() interface{} {
@@ -71,4 +76,5 @@ func (v *Var) Set(value interface{}) {
 
 	v.ch <- value
 	close(v.ch)
+	close(v.rq)
 }
