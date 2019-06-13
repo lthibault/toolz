@@ -42,39 +42,3 @@ func (f *Flag) Unset() { atomic.CompareAndSwapUint32((*uint32)(unsafe.Pointer(f)
 
 // Bool evaluates the flag's value
 func (f *Flag) Bool() bool { return atomic.LoadUint32((*uint32)(unsafe.Pointer(f))) != 0 }
-
-// Var is a variable that can be set exactly once.  Calls to Get will block until it is
-// set.
-type Var struct {
-	init, setter sync.Once
-	v            interface{}
-	ch           chan interface{}
-	rq           chan struct{}
-}
-
-func (v *Var) setup() {
-	v.ch = make(chan interface{}, 1)
-	v.rq = make(chan struct{})
-}
-
-// Ready returns a channel that is closed when the Var's value is set
-func (v *Var) Ready() <-chan struct{} { return v.rq }
-
-// Get the value once it is set
-func (v *Var) Get() interface{} {
-	v.init.Do(v.setup)
-	v.setter.Do(func() {
-		v.v = <-v.ch
-	})
-
-	return v.v
-}
-
-// Set the value
-func (v *Var) Set(value interface{}) {
-	v.init.Do(v.setup)
-
-	v.ch <- value
-	close(v.ch)
-	close(v.rq)
-}
