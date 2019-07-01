@@ -19,19 +19,57 @@ func init() {
 }
 
 func TestReadWrite(t *testing.T) {
-	t.Run("ReadPath", func(t *testing.T) {
-		b := bytes.NewBuffer(msgLenBytes)
-		b.WriteString(testMsg)
+	t.Run("Read", func(t *testing.T) {
+		t.Run("String", func(t *testing.T) {
+			b := bytes.NewBuffer(msgLenBytes)
+			b.WriteString(testMsg)
 
-		msg, err := ReadString(b, binary.BigEndian)
-		assert.NoError(t, err)
-		assert.Equal(t, testMsg, msg)
+			msg, err := ReadString(b, binary.BigEndian)
+			assert.NoError(t, err)
+			assert.Equal(t, testMsg, msg)
+		})
+
+		t.Run("Bytes", func(t *testing.T) {
+			b := bytes.NewBuffer(msgLenBytes)
+			b.WriteString(testMsg)
+
+			msg, err := Read(b, binary.BigEndian)
+			assert.NoError(t, err)
+			assert.Equal(t, testMsg, string(msg))
+		})
 	})
 
-	t.Run("WritePath", func(t *testing.T) {
-		b := new(bytes.Buffer)
-		assert.NoError(t, WriteString(b, binary.BigEndian, testMsg))
-		assert.Equal(t, msgLenBytes, b.Bytes()[:2])
-		assert.Equal(t, testMsg, b.String()[2:])
+	t.Run("Write", func(t *testing.T) {
+		t.Run("String", func(t *testing.T) {
+			b := new(bytes.Buffer)
+			assert.NoError(t, WriteString(b, binary.BigEndian, testMsg))
+			assert.Equal(t, msgLenBytes, b.Bytes()[:2])
+			assert.Equal(t, testMsg, b.String()[2:])
+		})
+
+		t.Run("Bytes", func(t *testing.T) {
+			b := new(bytes.Buffer)
+			assert.NoError(t, Write(b, binary.BigEndian, []byte(testMsg)))
+			assert.Equal(t, msgLenBytes, b.Bytes()[:2])
+			assert.Equal(t, testMsg, b.String()[2:])
+		})
+	})
+
+	t.Run("Integration", func(t *testing.T) {
+		t.Run("String", func(t *testing.T) {
+			b := new(bytes.Buffer)
+			assert.NoError(t, WriteString(b, binary.BigEndian, testMsg))
+			msg, err := ReadString(b, binary.BigEndian)
+			assert.NoError(t, err)
+			assert.Equal(t, testMsg, msg)
+		})
+
+		t.Run("Bytes", func(t *testing.T) {
+			b := new(bytes.Buffer)
+			assert.NoError(t, Write(b, binary.BigEndian, []byte(testMsg)))
+			msg, err := Read(b, binary.BigEndian)
+			assert.NoError(t, err)
+			assert.Equal(t, []byte(testMsg), msg)
+		})
 	})
 }
