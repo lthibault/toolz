@@ -5,9 +5,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"strings"
 	"sync"
-	"unsafe"
 )
 
 var pool = bpool{sync.Pool{New: func() interface{} { return new(bytes.Buffer) }}}
@@ -39,11 +37,15 @@ func Read(r io.Reader, order binary.ByteOrder) ([]byte, error) {
 
 // Write bytes to an io.Writer
 func Write(w io.Writer, order binary.ByteOrder, b []byte) error {
-	if err := writeHeader(w, order, len(b)); err != nil {
+	buf := pool.Get()
+	defer pool.Put(buf)
+
+	if err := writeHeader(buf, order, len(b)); err != nil {
 		return err
 	}
 
-	_, err := io.Copy(w, strings.NewReader(*(*string)(unsafe.Pointer(&b))))
+	buf.Write(b)
+	_, err := io.Copy(w, buf)
 	return err
 }
 
@@ -65,12 +67,17 @@ func ReadString(r io.Reader, order binary.ByteOrder) (string, error) {
 }
 
 // WriteString to an io.Writer
-func WriteString(w io.Writer, order binary.ByteOrder, b string) error {
-	if err := writeHeader(w, order, len(b)); err != nil {
+func WriteString(w io.Writer, order binary.ByteOrder, s string) error {
+	buf := pool.Get()
+	defer pool.Put(buf)
+
+	if err := writeHeader(buf, order, len(s)); err != nil {
 		return err
 	}
 
-	_, err := io.Copy(w, strings.NewReader(b))
+	buf.WriteString(s)
+
+	_, err := io.Copy(w, buf)
 	return err
 }
 
