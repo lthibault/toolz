@@ -6,9 +6,21 @@ import (
 	"context"
 	"encoding/binary"
 	"io"
-	"net"
 	"sync"
+	"time"
 )
+
+// ReaderConn is a read-only net.Conn
+type ReaderConn interface {
+	io.Reader
+	SetReadDeadline(time.Time) error
+}
+
+// WriterConn is a write-only net.Conn
+type WriterConn interface {
+	io.Writer
+	SetWriteDeadline(time.Time) error
+}
 
 var pool = bpool{sync.Pool{New: func() interface{} { return new(bytes.Buffer) }}}
 
@@ -39,7 +51,7 @@ func Read(r io.Reader, order binary.ByteOrder) ([]byte, error) {
 
 // ReadConn reads a single []byte message from a net.Conn.  It makes use of deadlines in
 // the context.  ReadConn calls SetReadDeadline.
-func ReadConn(ctx context.Context, conn net.Conn, order binary.ByteOrder) ([]byte, error) {
+func ReadConn(ctx context.Context, conn ReaderConn, order binary.ByteOrder) ([]byte, error) {
 	d, _ := ctx.Deadline()
 	if err := conn.SetReadDeadline(d); err != nil {
 		return nil, err
@@ -80,7 +92,7 @@ func Write(w io.Writer, order binary.ByteOrder, b []byte) error {
 
 // WriteConn writes a single []byte message to a net.Conn.  It makes use of deadlines in
 // the context.  ReadConn calls SetWriteDeadline.
-func WriteConn(ctx context.Context, conn net.Conn, order binary.ByteOrder, b []byte) error {
+func WriteConn(ctx context.Context, conn WriterConn, order binary.ByteOrder, b []byte) error {
 	d, _ := ctx.Deadline()
 	if err := conn.SetWriteDeadline(d); err != nil {
 		return err
