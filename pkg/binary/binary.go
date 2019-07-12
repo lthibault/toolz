@@ -3,8 +3,10 @@ package bintoolz
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"io"
+	"net"
 	"sync"
 )
 
@@ -35,6 +37,33 @@ func Read(r io.Reader, order binary.ByteOrder) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// ReadConn reads a single []byte message from a net.Conn.  It makes use of deadlines in
+// the context.  ReadConn calls SetReadDeadline.
+func ReadConn(ctx context.Context, conn net.Conn, order binary.ByteOrder) ([]byte, error) {
+	d, _ := ctx.Deadline()
+	if err := conn.SetReadDeadline(d); err != nil {
+		return nil, err
+	}
+
+	blen, err := readHeader(conn, order)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := conn.SetReadDeadline(d); err != nil {
+		return nil, err
+	}
+
+	buf := pool.Get()
+	defer pool.Put(buf)
+
+	if err = readBody(buf, conn, blen); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
 // Write bytes to an io.Writer
 func Write(w io.Writer, order binary.ByteOrder, b []byte) error {
 	buf := pool.Get()
@@ -46,6 +75,30 @@ func Write(w io.Writer, order binary.ByteOrder, b []byte) error {
 
 	buf.Write(b)
 	_, err := io.Copy(w, buf)
+	return err
+}
+
+// WriteConn writes a single []byte message to a net.Conn.  It makes use of deadlines in
+// the context.  ReadConn calls SetWriteDeadline.
+func WriteConn(ctx context.Context, conn net.Conn, order binary.ByteOrder, b []byte) error {
+	d, _ := ctx.Deadline()
+	if err := conn.SetWriteDeadline(d); err != nil {
+		return err
+	}
+
+	buf := pool.Get()
+	defer pool.Put(buf)
+
+	if err := writeHeader(buf, order, len(b)); err != nil {
+		return err
+	}
+
+	if err := conn.SetWriteDeadline(d); err != nil {
+		return err
+	}
+
+	buf.Write(b)
+	_, err := io.Copy(conn, buf)
 	return err
 }
 
